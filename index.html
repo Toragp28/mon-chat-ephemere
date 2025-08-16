@@ -1,249 +1,494 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" data-theme="auto">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chat Éphémère Crypté</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chat Éphémère Crypté — Ultimate Responsive</title>
+  <!-- PeerJS & CryptoJS -->
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
   <style>
+    /* =================== CSS VARIABLES (Thèmes) =================== */
+    :root {
+      --bg: linear-gradient(135deg, #0a2540, #16385f);
+      --text: #a5d8ff;
+      --muted: #80ffba;
+      --card: #1e3a5f;
+      --panel: #0a2540;
+      --border: #4fc3f7;
+      --accent: #4fc3f7;
+      --accent-2: #80d8ff;
+      --msg-sent: #4fc3f7;
+      --msg-recv: #e0f7fa;
+      --msg-text: #0a2540;
+      --danger: #ff6b6b;
+    }
+    
+    :root.light {
+      --bg: linear-gradient(135deg, #f7f7f9, #eceff4);
+      --text: #1f2937;
+      --muted: #12805a;
+      --card: #ffffff;
+      --panel: #f3f4f6;
+      --border: #cbd5e1;
+      --accent: #0ea5e9;
+      --accent-2: #38bdf8;
+      --msg-sent: #0ea5e9;
+      --msg-recv: #e5f6ff;
+      --msg-text: #0f172a;
+      --danger: #ef4444;
+    }
+
+    /* =================== BASE =================== */
+    html, body {
+      height: 100%;
+    }
     body {
-      background: linear-gradient(135deg, #0A2540, #16385F);
-      color: #A5D8FF;
-      font-family: 'Fira Code', 'Courier New', monospace;
       margin: 0;
-      padding: 20px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Fira Code", monospace;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+    }
+
+    /* App full-bleed container */
+    .app {
+      width: 100%;
+      max-width: 1400px;
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      grid-template-rows: 100vh; /* plein écran */
+      gap: 0;
+      box-sizing: border-box;
+    }
+
+    /* =================== SIDEBAR (PC) / TOPBAR (Mobile) =================== */
+    .sidebar {
+      background: var(--card);
+      border-right: 1px solid var(--border);
       display: flex;
       flex-direction: column;
+      padding: 16px;
+      gap: 12px;
+    }
+    .brand {
+      font-weight: 800;
+      letter-spacing: 0.3px;
+    }
+    .status-row {
+      display: flex;
       align-items: center;
-      height: 100vh;
+      gap: 8px;
+      font-size: 14px;
     }
+    .dot {
+      width: 10px; height: 10px; border-radius: 50%; background: #bbb;
+    }
+    .dot.online { background: #22c55e; }
+    .dot.offline { background: #ef4444; }
 
-    #chat-container {
-      width: 100%;
-      max-width: 650px;
-      background-color: #1E3A5F;
-      border-radius: 12px;
-      padding: 20px;
+    .field {
       display: flex;
       flex-direction: column;
-      height: 85vh;
-      box-shadow: 0px 8px 20px rgba(0,0,0,0.3);
+      gap: 6px;
     }
-
-    #messages {
-      flex-grow: 1;
-      overflow-y: auto;
-      margin-bottom: 15px;
-      padding: 15px;
-      background-color: #0A2540;
-      border: 1px solid #4FC3F7;
-      border-radius: 8px;
-      scrollbar-width: thin;
-    }
-
-    .message {
-      max-width: 70%;
-      padding: 10px 14px;
-      margin: 8px 0;
-      border-radius: 16px;
-      word-wrap: break-word;
-      line-height: 1.4;
-      animation: fadeIn 0.3s ease;
-    }
-
-    .message.sent {
-      background: #4FC3F7;
-      color: #0A2540;
-      align-self: flex-end;
-      border-bottom-right-radius: 4px;
-    }
-
-    .message.received {
-      background: #E0F7FA;
-      color: #0A2540;
-      align-self: flex-start;
-      border-bottom-left-radius: 4px;
-    }
-
-    #typing {
-      font-size: 0.9em;
-      color: #98FB98;
-      height: 20px;
-      margin-bottom: 8px;
-      font-style: italic;
-    }
-
-    #message-input {
-      flex: 1;
-      background-color: #0A2540;
-      border: 1px solid #A5D8FF;
-      color: #A5D8FF;
-      padding: 12px;
-      border-radius: 8px;
-      font-family: 'Fira Code', monospace;
-      transition: border-color 0.2s ease;
-    }
-    #message-input:focus {
+    .label { font-size: 12px; opacity: 0.85; }
+    .input, select {
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
       outline: none;
-      border-color: #80D8FF;
+    }
+    .row {
+      display: flex; gap: 8px; align-items: center;
+    }
+    .btn {
+      border: none; cursor: pointer; font-weight: 700;
+      background: var(--accent); color: var(--msg-text);
+      border-radius: 10px; padding: 10px 12px;
+      transition: transform .15s ease, background .2s ease;
+    }
+    .btn:hover { transform: scale(1.04); background: var(--accent-2); }
+    .btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    .btn.danger { background: var(--danger); color: #fff; }
+
+    .spacer { height: 8px; }
+    .divider { height: 1px; background: var(--border); opacity: .6; margin: 8px 0; border-radius: 1px; }
+
+    /* =================== MAIN CHAT =================== */
+    .main {
+      display: grid;
+      grid-template-rows: auto 1fr auto; /* topbar, messages, inputbar */
+      height: 100vh;
+      background: transparent;
     }
 
-    #room-input, #pseudo-input, #join-button, #send-button {
-      border: none;
-      padding: 12px;
-      border-radius: 8px;
-      font-family: 'Fira Code', monospace;
-      transition: transform 0.2s ease, background 0.2s ease;
-    }
-
-    #room-input, #pseudo-input {
-      background-color: #0A2540;
-      border: 1px solid #A5D8FF;
-      color: #A5D8FF;
-      width: 100%;
-      margin-bottom: 8px;
-    }
-    #room-input:focus, #pseudo-input:focus {
-      border-color: #80D8FF;
-    }
-
-    #join-button, #send-button {
-      background-color: #4FC3F7;
-      color: #0A2540;
-      cursor: pointer;
-      font-weight: bold;
-    }
-    #join-button:hover, #send-button:hover {
-      background-color: #80D8FF;
-      transform: scale(1.05);
-    }
-
-    #status {
-      color: #80FFBA;
-      margin-bottom: 10px;
-      font-weight: bold;
-    }
-
-    .input-row {
-      display: flex;
+    .topbar {
+      display: none; /* visible sur mobile */
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 12px;
+      align-items: center;
       gap: 8px;
-      margin-top: auto;
     }
 
-    @keyframes fadeIn {
-      from {opacity: 0; transform: translateY(5px);}
-      to {opacity: 1; transform: translateY(0);}
+    .messages {
+      background: var(--panel);
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 16px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+
+    .msg {
+      max-width: 65ch;
+      padding: 10px 14px; border-radius: 16px;
+      line-height: 1.45; position: relative; word-wrap: break-word;
+      animation: pop .2s ease;
+    }
+    .msg.sent {
+      align-self: flex-end;
+      background: var(--msg-sent); color: var(--msg-text);
+      border-bottom-right-radius: 6px;
+    }
+    .msg.recv {
+      align-self: flex-start;
+      background: var(--msg-recv); color: var(--msg-text);
+      border-bottom-left-radius: 6px;
+    }
+    .msg .meta {
+      font-size: 11px; opacity: .7; margin-top: 6px;
+    }
+    .msg .del {
+      position: absolute; top: 6px; right: 8px; cursor: pointer; font-size: 12px; opacity: .7;
+    }
+
+    .typing { height: 20px; font-size: 13px; color: var(--muted); padding: 4px 12px; }
+
+    .inputbar {
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: 1fr auto auto auto;
+      gap: 8px; padding: 10px;
+      align-items: center;
+    }
+
+    .file { display: none; }
+
+    /* =================== Animations =================== */
+    @keyframes pop { from { opacity: 0; transform: translateY(4px);} to { opacity: 1; transform: translateY(0);} }
+
+    /* =================== Responsive =================== */
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar {
+        grid-row: 1; grid-column: 1 / -1;
+        border-right: none; border-bottom: 1px solid var(--border);
+        /* transforme la sidebar en top-toolbar compacte */
+        flex-direction: column;
+        gap: 10px;
+      }
+      .main { grid-row: 2; }
+      .topbar { display: none; }
+      .messages { border-left: none; border-right: none; }
+      .inputbar { grid-template-columns: 1fr auto auto auto; }
+    }
+
+    @media (max-width: 520px) {
+      .sidebar { gap: 8px; padding: 12px; }
+      .row.stack { flex-direction: column; align-items: stretch; }
+      .inputbar { grid-template-columns: 1fr auto auto; }
+      .btn.hide-sm { display: none; }
     }
   </style>
 </head>
 <body>
-  <div id="chat-container">
-    <div id="status">Choisissez un pseudo et connectez-vous</div>
-    <input id="pseudo-input" type="text" placeholder="Votre pseudo">
-    <input id="room-input" type="text" placeholder="ID de l'autre utilisateur">
-    <button id="join-button">Connecter</button>
-    <div id="messages"></div>
-    <div id="typing"></div>
-    <div class="input-row">
-      <input id="message-input" type="text" placeholder="Tapez votre message...">
-      <button id="send-button">Envoyer</button>
-    </div>
+  <div class="app">
+    <!-- Sidebar (PC) / Toolbar (Mobile) -->
+    <aside class="sidebar">
+      <div class="brand">⚡ Secure P2P Chat</div>
+      <div class="status-row">
+        <span class="dot offline" id="status-dot"></span>
+        <span id="status-text">Hors ligne</span>
+      </div>
+
+      <div class="field">
+        <div class="label">Votre ID</div>
+        <div class="row">
+          <input id="my-id" class="input" type="text" readonly value="..." style="flex:1"/>
+          <button id="copy-id" class="btn" title="Copier l'ID">📋</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="label">Votre pseudo</div>
+        <input id="pseudo" class="input" type="text" placeholder="Anonyme" />
+      </div>
+
+      <div class="field">
+        <div class="label">Passphrase (clé partagée)</div>
+        <input id="passphrase" class="input" type="password" placeholder="Saisir la même clé que votre contact" />
+      </div>
+
+      <div class="field">
+        <div class="label">ID du destinataire</div>
+        <div class="row stack">
+          <input id="peer-id" class="input" type="text" placeholder="Ex: pe-xxxxx" />
+          <div class="row">
+            <button id="connect" class="btn">Se connecter</button>
+            <button id="disconnect" class="btn ghost">Couper</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="row" style="gap:8px; flex-wrap: wrap;">
+        <button id="toggle-theme" class="btn">🌙/☀️ Thème</button>
+        <button id="clear-chat" class="btn ghost">🧹 Effacer</button>
+      </div>
+
+      <div class="field">
+        <div class="label">Durée des messages</div>
+        <select id="expiry" class="input">
+          <option value="5000">5s</option>
+          <option value="10000">10s</option>
+          <option value="20000" selected>20s</option>
+          <option value="60000">1 min</option>
+          <option value="300000">5 min</option>
+        </select>
+      </div>
+
+      <div class="spacer"></div>
+      <small style="opacity:.75">P2P via PeerJS • AES via CryptoJS • Rien n'est stocké.</small>
+    </aside>
+
+    <!-- Main chat area -->
+    <main class="main">
+      <div class="topbar">
+        <strong>Chat</strong>
+      </div>
+
+      <section id="messages" class="messages"></section>
+      <div id="typing" class="typing"></div>
+
+      <div class="inputbar">
+        <input id="message" class="input" type="text" placeholder="Écrire un message..." />
+        <input id="file" class="file" type="file" />
+        <button id="file-btn" class="btn" title="Envoyer une image/un fichier">📎</button>
+        <button id="send" class="btn">Envoyer ➤</button>
+      </div>
+    </main>
   </div>
 
+  <!-- Audio notification -->
+  <audio id="notif" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
+
   <script>
-    const peer = new Peer();
-    let conn = null;
-    const secretKey = 'my-secret-key-123';
+    /* =============== State =============== */
+    const state = {
+      peer: null,
+      conn: null,
+      myIdEl: document.getElementById('my-id'),
+      statusDot: document.getElementById('status-dot'),
+      statusText: document.getElementById('status-text'),
+      pseudoEl: document.getElementById('pseudo'),
+      passEl: document.getElementById('passphrase'),
+      peerIdEl: document.getElementById('peer-id'),
+      expiryEl: document.getElementById('expiry'),
+      msgEl: document.getElementById('message'),
+      messagesEl: document.getElementById('messages'),
+      typingEl: document.getElementById('typing'),
+      fileEl: document.getElementById('file'),
+      lastSentAt: 0,
+      antiFloodMs: 400,
+    };
 
-    const pseudoInput = document.getElementById('pseudo-input');
-    const roomInput = document.getElementById('room-input');
-    const joinButton = document.getElementById('join-button');
-    const messageInput = document.getElementById('message-input');
-    const sendButton = document.getElementById('send-button');
-    const messagesDiv = document.getElementById('messages');
-    const statusDiv = document.getElementById('status');
-    const typingDiv = document.getElementById('typing');
+    /* =============== Theme handling =============== */
+    const root = document.documentElement;
+    function applyTheme(theme) {
+      if (theme === 'light') { root.classList.add('light'); }
+      else { root.classList.remove('light'); }
+      localStorage.setItem('theme', theme);
+    }
+    // Auto from system, then user override
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) applyTheme(savedTheme);
+    else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) applyTheme('light');
 
-    let myPseudo = 'Anonyme';
-    let typingTimeout;
-
-    peer.on('open', (id) => {
-      statusDiv.textContent = `Votre ID : ${id}. Partagez cet ID avec quelqu'un pour discuter.`;
+    document.getElementById('toggle-theme').addEventListener('click', () => {
+      const current = root.classList.contains('light') ? 'light' : 'dark';
+      applyTheme(current === 'light' ? 'dark' : 'light');
     });
 
-    joinButton.addEventListener('click', () => {
-      const targetId = roomInput.value.trim();
-      myPseudo = pseudoInput.value.trim() || 'Anonyme';
-      if (!targetId) {
-        statusDiv.textContent = 'Veuillez entrer un ID.';
-        return;
+    /* =============== Utilities =============== */
+    function colorFromPseudo(pseudo) {
+      let hash = 0; for (let i=0;i<pseudo.length;i++) hash = pseudo.charCodeAt(i) + ((hash<<5) - hash);
+      const c = n => (n & 0xFF).toString(16).padStart(2,'0');
+      return `#${c(hash>>24)}${c(hash>>16)}${c(hash>>8)}`;
+    }
+    function setOnline(on) {
+      state.statusDot.classList.toggle('online', !!on);
+      state.statusDot.classList.toggle('offline', !on);
+      state.statusText.textContent = on ? 'En ligne' : 'Hors ligne';
+    }
+    function notify() {
+      document.getElementById('notif').play().catch(()=>{});
+      if (document.hidden && 'Notification' in window) {
+        Notification.requestPermission().then(p => {
+          if (p === 'granted') new Notification('Nouveau message');
+        });
       }
-      if (targetId === peer.id) {
-        statusDiv.textContent = "Vous ne pouvez pas vous connecter à vous-même.";
-        return;
-      }
-      conn = peer.connect(targetId);
-      setupConnection();
-      statusDiv.textContent = `Tentative de connexion à ${targetId} avec pseudo ${myPseudo}...`;
-    });
+    }
+    function now() { return Date.now(); }
 
-    peer.on('connection', (connection) => {
-      if (conn) conn.close();
-      conn = connection;
-      setupConnection();
-      statusDiv.textContent = `Connecté à ${conn.peer} avec pseudo ${myPseudo}.`;
-    });
-
-    function setupConnection() {
-      conn.on('data', (data) => {
-        const decrypted = JSON.parse(CryptoJS.AES.decrypt(data, secretKey).toString(CryptoJS.enc.Utf8));
-
-        if (decrypted.typing) {
-          typingDiv.textContent = `${decrypted.pseudo} est en train d'écrire...`;
-          clearTimeout(typingTimeout);
-          typingTimeout = setTimeout(() => typingDiv.textContent = "", 1500);
-        } else {
-          addMessage(decrypted.message, 'received', decrypted.pseudo || conn.peer);
-          typingDiv.textContent = "";
-        }
-      });
-      conn.on('error', (err) => {
-        statusDiv.textContent = `Erreur : ${err}`;
-      });
-      conn.on('close', () => {
-        statusDiv.textContent = 'Connexion fermée.';
-      });
+    function encrypt(obj) {
+      const pass = state.passEl.value || 'my-secret-key-123'; // fallback si vide
+      return CryptoJS.AES.encrypt(JSON.stringify(obj), pass).toString();
+    }
+    function decrypt(cipher) {
+      const pass = state.passEl.value || 'my-secret-key-123';
+      try {
+        const txt = CryptoJS.AES.decrypt(cipher, pass).toString(CryptoJS.enc.Utf8);
+        return JSON.parse(txt);
+      } catch (e) { return null; }
     }
 
-    sendButton.addEventListener('click', sendMessage);
-    messageInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') sendMessage();
-      else sendTyping();
+    function addMessage({type, pseudo, message, data, name}, who) {
+      const box = document.createElement('div');
+      box.className = 'msg ' + (who === 'me' ? 'sent' : 'recv');
+      const color = colorFromPseudo(pseudo || 'Anonyme');
+
+      let inner = `<strong style="color:${color}">${pseudo || 'Anonyme'}</strong><br/>`;
+      if (type === 'text') inner += `${escapeHtml(message)}`;
+      if (type === 'image') inner += `<img src="${data}" alt="image" style="max-width: min(360px, 80vw); border-radius: 10px; display:block;"/>`;
+      if (type === 'file') inner += `📎 <a href="${data}" download="${name}">Télécharger ${escapeHtml(name||'fichier')}</a>`;
+
+      inner += `<span class="del" title="Supprimer">✖</span>`;
+      box.innerHTML = inner;
+      box.querySelector('.del').addEventListener('click', () => box.remove());
+
+      state.messagesEl.appendChild(box);
+      state.messagesEl.scrollTop = state.messagesEl.scrollHeight;
+
+      // Auto-destruction
+      const ttl = parseInt(state.expiryEl.value, 10) || 20000;
+      setTimeout(() => box.remove(), ttl);
+    }
+
+    function escapeHtml(str='') {
+      return str.replace(/[&<>"]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]));
+    }
+
+    /* =============== PeerJS setup =============== */
+    state.peer = new Peer();
+
+    state.peer.on('open', id => {
+      state.myIdEl.value = id;
     });
 
-    function sendMessage() {
-      const message = messageInput.value.trim();
-      if (!message || !conn) return;
-      const encrypted = CryptoJS.AES.encrypt(JSON.stringify({ message, pseudo: myPseudo }), secretKey).toString();
-      conn.send(encrypted);
-      addMessage(message, 'sent', myPseudo);
-      messageInput.value = '';
+    state.peer.on('connection', connection => {
+      if (state.conn) state.conn.close();
+      state.conn = connection;
+      bindConn();
+    });
+
+    function bindConn() {
+      setOnline(true);
+      state.conn.on('data', raw => {
+        const data = decrypt(raw);
+        if (!data) return; // mauvaise clé ou message corrompu
+        if (data.typing) {
+          state.typingEl.textContent = `${data.pseudo || 'Contact'} est en train d'écrire...`;
+          clearTimeout(window.__typingTO);
+          window.__typingTO = setTimeout(()=>state.typingEl.textContent='', 1200);
+          return;
+        }
+        addMessage(data, 'peer');
+        notify();
+      });
+      state.conn.on('close', () => { setOnline(false); });
+      state.conn.on('error', () => { setOnline(false); });
+    }
+
+    /* =============== Controls =============== */
+    document.getElementById('copy-id').addEventListener('click', () => {
+      navigator.clipboard.writeText(state.myIdEl.value || '').then(()=>{
+        state.statusText.textContent = 'ID copié';
+        setTimeout(()=>state.statusText.textContent = state.conn? 'En ligne':'Hors ligne', 1200);
+      });
+    });
+
+    document.getElementById('connect').addEventListener('click', () => {
+      const target = state.peerIdEl.value.trim();
+      if (!target) { state.statusText.textContent = 'Entrez un ID de destinataire'; return; }
+      if (target === state.myIdEl.value) { state.statusText.textContent = 'Impossible de se connecter à soi-même'; return; }
+      const c = state.peer.connect(target);
+      state.conn = c;
+      bindConn();
+    });
+
+    document.getElementById('disconnect').addEventListener('click', () => {
+      if (state.conn) { try { state.conn.close(); } catch (e) {} }
+      setOnline(false);
+    });
+
+    document.getElementById('clear-chat').addEventListener('click', () => {
+      state.messagesEl.innerHTML = '';
+    });
+
+    // Send text
+    document.getElementById('send').addEventListener('click', sendText);
+    state.msgEl.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') sendText(); else sendTyping();
+    });
+
+    function sendText() {
+      if (!state.conn) return;
+      const t = now();
+      if (t - state.lastSentAt < state.antiFloodMs) return; // anti-flood
+      state.lastSentAt = t;
+
+      const txt = state.msgEl.value.trim();
+      if (!txt) return;
+      const payload = { type: 'text', message: txt, pseudo: (state.pseudoEl.value || 'Anonyme') };
+      state.conn.send(encrypt(payload));
+      addMessage(payload, 'me');
+      state.msgEl.value = '';
     }
 
     function sendTyping() {
-      if (!conn) return;
-      const encrypted = CryptoJS.AES.encrypt(JSON.stringify({ typing: true, pseudo: myPseudo }), secretKey).toString();
-      conn.send(encrypted);
+      if (!state.conn) return;
+      const payload = { typing: true, pseudo: (state.pseudoEl.value || 'Anonyme') };
+      state.conn.send(encrypt(payload));
     }
 
-    function addMessage(message, type, sender) {
-      const messageElement = document.createElement('div');
-      messageElement.classList.add('message', type);
-      messageElement.innerHTML = `<strong>${sender}:</strong> ${message}`;
-      messagesDiv.appendChild(messageElement);
-      messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    }
+    // Files/images
+    document.getElementById('file-btn').addEventListener('click', () => state.fileEl.click());
+    state.fileEl.addEventListener('change', (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (!f || !state.conn) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const isImg = (f.type || '').startsWith('image/');
+        const payload = {
+          type: isImg ? 'image' : 'file',
+          name: f.name,
+          data: reader.result,
+          pseudo: (state.pseudoEl.value || 'Anonyme'),
+        };
+        state.conn.send(encrypt(payload));
+        addMessage(payload, 'me');
+        state.fileEl.value = '';
+      };
+      reader.readAsDataURL(f);
+    });
   </script>
 </body>
 </html>
