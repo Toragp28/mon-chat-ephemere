@@ -8,7 +8,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
   <style>
     body {
-      background-color: #0A2540;
+      background: linear-gradient(135deg, #0A2540, #16385F);
       color: #A5D8FF;
       font-family: 'Fira Code', 'Courier New', monospace;
       margin: 0;
@@ -18,72 +18,122 @@
       align-items: center;
       height: 100vh;
     }
+
     #chat-container {
       width: 100%;
-      max-width: 600px;
+      max-width: 650px;
       background-color: #1E3A5F;
-      border-radius: 8px;
+      border-radius: 12px;
       padding: 20px;
       display: flex;
       flex-direction: column;
-      height: 80vh;
+      height: 85vh;
+      box-shadow: 0px 8px 20px rgba(0,0,0,0.3);
     }
+
     #messages {
       flex-grow: 1;
       overflow-y: auto;
-      margin-bottom: 20px;
-      padding: 10px;
+      margin-bottom: 15px;
+      padding: 15px;
       background-color: #0A2540;
-      border: 1px solid #A5D8FF;
-      border-radius: 4px;
+      border: 1px solid #4FC3F7;
+      border-radius: 8px;
+      scrollbar-width: thin;
     }
+
     .message {
-      background-color: #E0F7FA;
-      color: #0A2540;
-      padding: 8px 12px;
-      margin: 5px 0;
-      border-radius: 4px;
+      max-width: 70%;
+      padding: 10px 14px;
+      margin: 8px 0;
+      border-radius: 16px;
       word-wrap: break-word;
+      line-height: 1.4;
+      animation: fadeIn 0.3s ease;
     }
+
     .message.sent {
-      background-color: #4FC3F7;
-      margin-left: 20%;
+      background: #4FC3F7;
+      color: #0A2540;
+      align-self: flex-end;
+      border-bottom-right-radius: 4px;
     }
+
     .message.received {
-      background-color: #E0F7FA;
-      margin-right: 20%;
+      background: #E0F7FA;
+      color: #0A2540;
+      align-self: flex-start;
+      border-bottom-left-radius: 4px;
     }
+
+    #typing {
+      font-size: 0.9em;
+      color: #98FB98;
+      height: 20px;
+      margin-bottom: 8px;
+      font-style: italic;
+    }
+
     #message-input {
+      flex: 1;
       background-color: #0A2540;
       border: 1px solid #A5D8FF;
       color: #A5D8FF;
-      padding: 10px;
-      border-radius: 4px;
-      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
       font-family: 'Fira Code', monospace;
+      transition: border-color 0.2s ease;
     }
+    #message-input:focus {
+      outline: none;
+      border-color: #80D8FF;
+    }
+
     #room-input, #pseudo-input, #join-button, #send-button {
-      background-color: #4FC3F7;
       border: none;
-      color: #0A2540;
-      padding: 10px;
-      border-radius: 4px;
-      cursor: pointer;
-      margin: 5px;
+      padding: 12px;
+      border-radius: 8px;
       font-family: 'Fira Code', monospace;
+      transition: transform 0.2s ease, background 0.2s ease;
     }
+
     #room-input, #pseudo-input {
       background-color: #0A2540;
       border: 1px solid #A5D8FF;
       color: #A5D8FF;
+      width: 100%;
+      margin-bottom: 8px;
     }
-    #room-input:focus, #pseudo-input:focus, #message-input:focus {
-      outline: none;
+    #room-input:focus, #pseudo-input:focus {
       border-color: #80D8FF;
     }
+
+    #join-button, #send-button {
+      background-color: #4FC3F7;
+      color: #0A2540;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    #join-button:hover, #send-button:hover {
+      background-color: #80D8FF;
+      transform: scale(1.05);
+    }
+
     #status {
-      color: #98FB98;
+      color: #80FFBA;
       margin-bottom: 10px;
+      font-weight: bold;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 8px;
+      margin-top: auto;
+    }
+
+    @keyframes fadeIn {
+      from {opacity: 0; transform: translateY(5px);}
+      to {opacity: 1; transform: translateY(0);}
     }
   </style>
 </head>
@@ -94,8 +144,11 @@
     <input id="room-input" type="text" placeholder="ID de l'autre utilisateur">
     <button id="join-button">Connecter</button>
     <div id="messages"></div>
-    <input id="message-input" type="text" placeholder="Tapez votre message...">
-    <button id="send-button">Envoyer</button>
+    <div id="typing"></div>
+    <div class="input-row">
+      <input id="message-input" type="text" placeholder="Tapez votre message...">
+      <button id="send-button">Envoyer</button>
+    </div>
   </div>
 
   <script>
@@ -110,8 +163,10 @@
     const sendButton = document.getElementById('send-button');
     const messagesDiv = document.getElementById('messages');
     const statusDiv = document.getElementById('status');
+    const typingDiv = document.getElementById('typing');
 
     let myPseudo = 'Anonyme';
+    let typingTimeout;
 
     peer.on('open', (id) => {
       statusDiv.textContent = `Votre ID : ${id}. Partagez cet ID avec quelqu'un pour discuter.`;
@@ -143,7 +198,15 @@
     function setupConnection() {
       conn.on('data', (data) => {
         const decrypted = JSON.parse(CryptoJS.AES.decrypt(data, secretKey).toString(CryptoJS.enc.Utf8));
-        addMessage(decrypted.message, 'received', decrypted.pseudo || conn.peer);
+
+        if (decrypted.typing) {
+          typingDiv.textContent = `${decrypted.pseudo} est en train d'écrire...`;
+          clearTimeout(typingTimeout);
+          typingTimeout = setTimeout(() => typingDiv.textContent = "", 1500);
+        } else {
+          addMessage(decrypted.message, 'received', decrypted.pseudo || conn.peer);
+          typingDiv.textContent = "";
+        }
       });
       conn.on('error', (err) => {
         statusDiv.textContent = `Erreur : ${err}`;
@@ -156,6 +219,7 @@
     sendButton.addEventListener('click', sendMessage);
     messageInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') sendMessage();
+      else sendTyping();
     });
 
     function sendMessage() {
@@ -165,6 +229,12 @@
       conn.send(encrypted);
       addMessage(message, 'sent', myPseudo);
       messageInput.value = '';
+    }
+
+    function sendTyping() {
+      if (!conn) return;
+      const encrypted = CryptoJS.AES.encrypt(JSON.stringify({ typing: true, pseudo: myPseudo }), secretKey).toString();
+      conn.send(encrypted);
     }
 
     function addMessage(message, type, sender) {
@@ -177,3 +247,4 @@
   </script>
 </body>
 </html>
+
