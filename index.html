@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat Éphémère Crypté</title>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+  <style>
+    body {
+      background-color: #0A2540; /* Bleu foncé reposant (Telegram-like) */
+      color: #A5D8FF; /* Bleu clair pour texte */
+      font-family: 'Fira Code', 'Courier New', monospace;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      height: 100vh;
+    }
+    #chat-container {
+      width: 100%;
+      max-width: 600px;
+      background-color: #1E3A5F; /* Bleu moyen */
+      border-radius: 8px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      height: 80vh;
+    }
+    #messages {
+      flex-grow: 1;
+      overflow-y: auto;
+      margin-bottom: 20px;
+      padding: 10px;
+      background-color: #0A2540;
+      border: 1px solid #A5D8FF;
+      border-radius: 4px;
+    }
+    .message {
+      background-color: #E0F7FA; /* Gris-bleu clair pour messages */
+      color: #0A2540;
+      padding: 8px 12px;
+      margin: 5px 0;
+      border-radius: 4px;
+      word-wrap: break-word;
+    }
+    .message.sent {
+      background-color: #4FC3F7; /* Bleu plus vif pour messages envoyés */
+      margin-left: 20%;
+    }
+    .message.received {
+      background-color: #E0F7FA;
+      margin-right: 20%;
+    }
+    #message-input {
+      background-color: #0A2540;
+      border: 1px solid #A5D8FF;
+      color: #A5D8FF;
+      padding: 10px;
+      border-radius: 4px;
+      width: 100%;
+      font-family: 'Fira Code', monospace;
+    }
+    #room-input, #join-button, #send-button {
+      background-color: #4FC3F7; /* Bleu Telegram */
+      border: none;
+      color: #0A2540;
+      padding: 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 5px;
+      font-family: 'Fira Code', monospace;
+    }
+    #room-input {
+      background-color: #0A2540;
+      border: 1px solid #A5D8FF;
+      color: #A5D8FF;
+    }
+    #room-input:focus, #message-input:focus {
+      outline: none;
+      border-color: #80D8FF;
+    }
+    #status {
+      color: #98FB98; /* Vert pâle pour statut */
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div id="chat-container">
+    <div id="status">Entrez un nom de room pour commencer</div>
+    <input id="room-input" type="text" placeholder="Nom de la room">
+    <button id="join-button">Rejoindre</button>
+    <div id="messages"></div>
+    <input id="message-input" type="text" placeholder="Tapez votre message...">
+    <button id="send-button">Envoyer</button>
+  </div>
+
+  <script>
+    // Initialisation PeerJS
+    const peer = new Peer();
+    let conn = null;
+    const secretKey = 'my-secret-key-123'; // Clé de chiffrement (à sécuriser en prod)
+
+    // Éléments DOM
+    const roomInput = document.getElementById('room-input');
+    const joinButton = document.getElementById('join-button');
+    const messageInput = document.getElementById('message-input');
+    const sendButton = document.getElementById('send-button');
+    const messagesDiv = document.getElementById('messages');
+    const statusDiv = document.getElementById('status');
+
+    // Générer un ID unique pour l'utilisateur
+    peer.on('open', (id) => {
+      statusDiv.textContent = `Votre ID : ${id}. Partagez le nom de la room pour discuter.`;
+    });
+
+    // Rejoindre une room
+    joinButton.addEventListener('click', () => {
+      const roomId = roomInput.value.trim();
+      if (!roomId) {
+        statusDiv.textContent = 'Veuillez entrer un nom de room.';
+        return;
+      }
+      // Utiliser le roomId comme ID de destination (simplifié)
+      conn = peer.connect(roomId);
+      setupConnection();
+      statusDiv.textContent = `Connecté à la room : ${roomId}`;
+    });
+
+    // Gérer les connexions entrantes
+    peer.on('connection', (connection) => {
+      conn = connection;
+      setupConnection();
+      statusDiv.textContent = `Quelqu'un a rejoint la room !`;
+    });
+
+    // Configurer la connexion
+    function setupConnection() {
+      conn.on('data', (data) => {
+        // Déchiffrer le message
+        const decrypted = CryptoJS.AES.decrypt(data, secretKey).toString(CryptoJS.enc.Utf8);
+        addMessage(decrypted, 'received');
+      });
+      conn.on('close', () => {
+        statusDiv.textContent = 'Connexion fermée.';
+      });
+    }
+
+    // Envoyer un message
+    sendButton.addEventListener('click', sendMessage);
+    messageInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') sendMessage();
+    });
+
+    function sendMessage() {
+      const message = messageInput.value.trim();
+      if (!message || !conn) return;
+      // Chiffrer le message
+      const encrypted = CryptoJS.AES.encrypt(message, secretKey).toString();
+      conn.send(encrypted);
+      addMessage(message, 'sent');
+      messageInput.value = '';
+    }
+
+    // Afficher un message
+    function addMessage(message, type) {
+      const messageElement = document.createElement('div');
+      messageElement.classList.add('message', type);
+      messageElement.textContent = message;
+      messagesDiv.appendChild(messageElement);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    // Gestion des erreurs
+    peer.on('error', (err) => {
+      statusDiv.textContent = `Erreur : ${err}`;
+    });
+  </script>
+</body>
+</html>
