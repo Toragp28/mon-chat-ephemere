@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat Serveur Éphémère</title>
+  <script type="module" src="https://cdn.jsdelivr.net/npm/trystero@0.20.0/torrent.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+  <style>
+    body {
+      background-color: #0A2540;
+      color: #A5D8FF;
+      font-family: 'Fira Code', 'Courier New', monospace;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      height: 100vh;
+    }
+    #chat-container {
+      width: 100%;
+      max-width: 600px;
+      background-color: #1E3A5F;
+      border-radius: 8px;
+      padding: 20px;
+      height: 80vh;
+      display: flex;
+      flex-direction: column;
+    }
+    #status {
+      color: #98FB98;
+      margin-bottom: 15px;
+      text-align: center;
+    }
+    select, input, button {
+      background-color: #0A2540;
+      border: 1px solid #A5D8FF;
+      color: #A5D8FF;
+      padding: 10px;
+      border-radius: 4px;
+      font-family: 'Fira Code', monospace;
+      margin: 5px 0;
+      width: 100%;
+    }
+    button {
+      background-color: #4FC3F7;
+      border: none;
+      color: #0A2540;
+      cursor: pointer;
+    }
+    #messages {
+      flex-grow: 1;
+      overflow-y: auto;
+      margin-bottom: 20px;
+      padding: 10px;
+      background-color: #0A2540;
+      border: 1px solid #A5D8FF;
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+    .message {
+      align-self: flex-start;
+      display: flex;
+      flex-direction: column;
+      max-width: 70%;
+      background-color: #E0F7FA;
+      margin-bottom: 8px;
+      border-radius: 6px;
+      padding: 8px 12px;
+      box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
+      color: #0A2540;
+      word-wrap: break-word;
+    }
+    .message.sent {
+      align-self: flex-end;
+      background-color: #4FC3F7;
+    }
+    .message__sender {
+      font-weight: bold;
+      margin-bottom: 2px;
+    }
+    .message__text {
+      margin-bottom: 2px;
+    }
+    .message__time {
+      font-size: 0.8em;
+      color: #666;
+      align-self: flex-end;
+    }
+  </style>
+</head>
+<body>
+  <div id="chat-container">
+    <div id="status">Choisissez un server pour rejoindre</div>
+    <input id="pseudo-input" type="text" placeholder="Votre pseudo">
+    <select id="server-select">
+      <option value="">Choisissez un server</option>
+      <option value="general">Général</option>
+      <option value="tech">Tech</option>
+      <option value="fun">Fun</option>
+      <option value="offtopic">Off-Topic</option>
+    </select>
+    <button id="join-button">Rejoindre Server</button>
+    <div id="messages"></div>
+    <input id="message-input" type="text" placeholder="Tapez votre message...">
+    <button id="send-button">Envoyer</button>
+  </div>
+
+  <script type="module">
+    import {joinRoom} from 'https://cdn.jsdelivr.net/npm/trystero@0.20.0/torrent.min.js';
+
+    const config = {appId: 'chat-server-crypt', password: 'my-secret-key-123'};
+    let serverRoom = null;
+    let myPseudo = 'Anonyme';
+    const statusDiv = document.getElementById('status');
+    const messagesDiv = document.getElementById('messages');
+    const pseudoInput = document.getElementById('pseudo-input');
+    const serverSelect = document.getElementById('server-select');
+    const joinButton = document.getElementById('join-button');
+    const messageInput = document.getElementById('message-input');
+    const sendButton = document.getElementById('send-button');
+
+    joinButton.addEventListener('click', () => {
+      myPseudo = pseudoInput.value.trim() || 'Anonyme';
+      const serverId = serverSelect.value;
+      if (!serverId) return statusDiv.textContent = 'Choisissez un server.';
+      serverRoom = joinRoom(config, serverId);
+      setupRoom();
+      statusDiv.textContent = `Connecté au server ${serverId} avec pseudo ${myPseudo}`;
+    });
+
+    function setupRoom() {
+      const [sendMsg, receiveMsg] = serverRoom.makeAction('msg');
+
+      serverRoom.onPeerJoin(peerId => addMessage(`Utilisateur ${peerId} a rejoint.`, 'received', 'Système'));
+      serverRoom.onPeerLeave(peerId => addMessage(`Utilisateur ${peerId} a quitté.`, 'received', 'Système'));
+
+      receiveMsg((data, peerId) => {
+        const decrypted = JSON.parse(CryptoJS.AES.decrypt(data, config.password).toString(CryptoJS.enc.Utf8));
+        addMessage(decrypted.message, 'received', decrypted.pseudo || peerId);
+      });
+    }
+
+    sendButton.addEventListener('click', sendMessage);
+    messageInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') sendMessage();
+    });
+
+    function sendMessage() {
+      if (!serverRoom) return;
+      const message = messageInput.value.trim();
+      if (!message) return;
+      const [sendMsg] = serverRoom.makeAction('msg');
+      const encrypted = CryptoJS.AES.encrypt(JSON.stringify({message, pseudo: myPseudo}), config.password).toString();
+      sendMsg(encrypted);
+      addMessage(message, 'sent', myPseudo);
+      messageInput.value = '';
+    }
+
+    function addMessage(message, typeClass, sender) {
+      const messageElement = document.createElement('div');
+      messageElement.classList.add('message', typeClass);
+      const time = new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'});
+      messageElement.innerHTML = `
+        <div class="message__sender">${sender}</div>
+        <div class="message__text">${message}</div>
+        <div class="message__time">${time}</div>
+      `;
+      messagesDiv.appendChild(messageElement);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+  </script>
+</body>
+</html>
