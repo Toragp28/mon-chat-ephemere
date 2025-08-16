@@ -1,6 +1,4 @@
 # mon-chat-ephemere
-Voici une proposition d’un **README clair, professionnel et esthétique** pour ton projet 👇
-
 ---
 
 # 🔐 Chat Éphémère Crypté
